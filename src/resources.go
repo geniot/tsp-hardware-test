@@ -21,7 +21,7 @@ type ImageDescriptor struct {
 	ResourceKey ResourceKey
 }
 
-func GetImage(fileName string) *sdl.RWops {
+func LoadMediaFile(fileName string) *sdl.RWops {
 	file, _ := mediaList.Open("media/" + fileName)
 	return GetResource(file)
 }
@@ -42,7 +42,7 @@ func LoadTexture(fileName string, sdlRenderer *sdl.Renderer) *sdl.Texture {
 }
 
 func LoadSurfTexture(fileName string, sdlRenderer *sdl.Renderer) *SurfTexture {
-	surface, err := img.LoadRW(GetImage(fileName), true)
+	surface, err := img.LoadRW(LoadMediaFile(fileName), true)
 	if err != nil {
 		println(err.Error())
 	}

@@ -5,9 +5,12 @@ import (
 	mapset "github.com/deckarep/golang-set/v2"
 	"github.com/tevino/abool/v2"
 	"github.com/veandco/go-sdl2/sdl"
+	"github.com/veandco/go-sdl2/ttf"
 	"log"
 	"os"
+	"runtime"
 	"runtime/debug"
+	"strconv"
 )
 
 type Application struct {
@@ -16,6 +19,7 @@ type Application struct {
 	sdlWindow          *sdl.Window
 	sdlRenderer        *sdl.Renderer
 	sdlGameController  *sdl.GameController
+	font               *ttf.Font
 	joysticks          [16]*sdl.Joystick
 	pressedKeysCodes   mapset.Set[sdl.Keycode]
 	pressedButtonCodes mapset.Set[ButtonCode]
@@ -42,14 +46,22 @@ func (app *Application) Start(args []string) {
 			os.Exit(-1)
 		}
 	}()
+
 	orPanic(sdl.Init(sdl.INIT_VIDEO | sdl.INIT_JOYSTICK | sdl.INIT_GAMECONTROLLER))
+
+	orPanic(ttf.Init())
+	app.font = orPanicRes(ttf.OpenFontRW(LoadMediaFile("pixelberry.ttf"), 1, 20))
+
 	sdl.JoystickEventState(sdl.ENABLE)
 	for i := 0; i < sdl.NumJoysticks(); i++ {
 		if sdl.IsGameController(i) {
 			app.sdlGameController = sdl.GameControllerOpen(i)
 		}
 	}
-	orPanic(app.sdlGameController != nil)
+	println(runtime.GOARCH)
+	if runtime.GOARCH == "arm64" { //most likely it's a TSP device
+		orPanic(app.sdlGameController != nil)
+	}
 
 	app.sdlWindow = orPanicRes(sdl.CreateWindow(
 		APP_NAME+" "+APP_VERSION,
@@ -66,12 +78,18 @@ func (app *Application) Start(args []string) {
 		app.UpdatePhysics()
 		app.UpdateView()
 	}
+	app.releaseResources()
 }
 
 func (app *Application) Stop() {
 	app.isRunning.UnSet()
+}
+
+func (app *Application) releaseResources() {
 	app.settings.Save(app.sdlWindow)
 	app.sdlGameController.Close()
+	app.font.Close()
+	ttf.Quit()
 	sdl.Quit()
 }
 
@@ -82,7 +100,6 @@ func (app *Application) UpdateEvents() {
 		case *sdl.JoyAxisEvent:
 			// Convert the value to a -1.0 - 1.0 range
 			value := float32(t.Value) / 32768.0
-			println(t.Axis, value)
 			app.axisValues[t.Axis] = value
 			break
 
@@ -149,6 +166,13 @@ func (app *Application) UpdateView() {
 	app.renderJoystick(BUTTON_CODE_LEFT_JOYSTICK, Reactors[BUTTON_CODE_LEFT_JOYSTICK].OffsetX, Reactors[BUTTON_CODE_LEFT_JOYSTICK].OffsetY, app.axisValues[0], app.axisValues[1], sdl.K_l)
 	app.renderJoystick(BUTTON_CODE_RIGHT_JOYSTICK, Reactors[BUTTON_CODE_RIGHT_JOYSTICK].OffsetX, Reactors[BUTTON_CODE_RIGHT_JOYSTICK].OffsetY, app.axisValues[3], app.axisValues[4], sdl.K_r)
 
+	var arr = [4]int{0, 1, 3, 4}
+	for i := 0; i < len(arr); i++ {
+		var val = float64(app.axisValues[arr[i]])
+		var valStr = strconv.FormatFloat(val, 'f', 6, 64)
+		app.drawText(valStr, int32(If(val < 0, 5, 18)), int32(i*30))
+	}
+
 	for val := range app.pressedButtonCodes.Iter() {
 		if Reactors[val] != nil {
 			width := If(Reactors[val].Width == 0, app.resources[Reactors[val].ResourceKey].W, Reactors[val].Width)
@@ -180,4 +204,12 @@ func (app *Application) initResources() {
 	app.resources[RESOURCE_CIRCLE_YELLOW_KEY] = LoadSurfTexture("circle_yellow.png", app.sdlRenderer)
 	app.resources[RESOURCE_CROSS_YELLOW_KEY] = LoadSurfTexture("cross_yellow.png", app.sdlRenderer)
 	app.resources[RESOURCE_CIRCLE_RED_KEY] = LoadSurfTexture("circle_red.png", app.sdlRenderer)
+}
+
+func (app *Application) drawText(val string, x, y int32) {
+	textSurface, _ := app.font.RenderUTF8Blended(val, COLOR_BLACK)
+	defer textSurface.Free()
+	textTexture, _ := app.sdlRenderer.CreateTextureFromSurface(textSurface)
+	orWarn(app.sdlRenderer.Copy(textTexture, nil, &sdl.Rect{X: x, Y: y, W: textSurface.W, H: textSurface.H}))
+	defer orWarn(textTexture.Destroy())
 }
