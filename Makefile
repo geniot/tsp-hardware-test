@@ -2,7 +2,7 @@ PROJECT_NAME := tsp-hardware-test
 PROGRAM_NAME := hwt
 DEPLOY_PATH := /mnt/SDCARD/Apps/HardwareTest
 
-IP := 192.168.0.103
+IP := 192.168.0.101
 USN := root
 PWD := tina
 
@@ -19,9 +19,6 @@ build:
 	go build -o bin/${PROGRAM_NAME} ${PROJECT_NAME}/src/
 
 deploy:
-	sshpass -p ${PWD} ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null ${USN}@${IP} "if pgrep S99runtrimui; then pkill -f S99runtrimui; fi"
-	sshpass -p ${PWD} ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null ${USN}@${IP} "if pgrep runtrimui.sh; then pkill -f runtrimui.sh; fi"
-	sshpass -p ${PWD} ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null ${USN}@${IP} "if pgrep MainUI; then pkill -f MainUI; fi"
 	sshpass -p ${PWD} ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null ${USN}@${IP} "rm ${DEPLOY_PATH}/${PROGRAM_NAME} -f"
 	sshpass -p ${PWD} scp -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null bin/${PROGRAM_NAME} ${USN}@${IP}:${DEPLOY_PATH}
 	sshpass -p ${PWD} ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null ${USN}@${IP} "chmod 777 ${DEPLOY_PATH}/${PROGRAM_NAME}"

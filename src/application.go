@@ -13,6 +13,7 @@ type Application struct {
 	resources          map[ResourceKey]*SurfTexture
 	sdlWindow          *sdl.Window
 	sdlRenderer        *sdl.Renderer
+	sdlGameController  *sdl.GameController
 	joysticks          [16]*sdl.Joystick
 	pressedKeysCodes   mapset.Set[sdl.Keycode]
 	pressedButtonCodes mapset.Set[ButtonCode]
@@ -32,11 +33,16 @@ func NewApplication() *Application {
 func (app *Application) Start(args []string) {
 	var err error
 
-	if err := sdl.Init(sdl.INIT_VIDEO); err != nil {
+	if err := sdl.Init(sdl.INIT_VIDEO | sdl.INIT_JOYSTICK | sdl.INIT_GAMECONTROLLER); err != nil {
 		println(err.Error())
 		os.Exit(1)
 	}
 	sdl.JoystickEventState(sdl.ENABLE)
+	for i := 0; i < sdl.NumJoysticks(); i++ {
+		if sdl.IsGameController(i) {
+			app.sdlGameController = sdl.GameControllerOpen(i)
+		}
+	}
 
 	app.settings = NewSettings()
 	if app.sdlWindow, err = sdl.CreateWindow(
@@ -75,7 +81,7 @@ func (app *Application) UpdateEvents() {
 			app.axisValues[t.Axis] = value
 			break
 
-		case *sdl.JoyButtonEvent:
+		case *sdl.ControllerButtonEvent:
 			if t.State == sdl.PRESSED {
 				println(t.Button)
 				app.pressedButtonCodes.Add(t.Button)
@@ -123,7 +129,7 @@ func (app *Application) UpdateEvents() {
 }
 
 func (app *Application) UpdatePhysics() {
-	if app.pressedKeysCodes.Contains(sdl.K_q) || (app.pressedButtonCodes.Contains(BUTTON_CODE_SELECT) && app.pressedButtonCodes.Contains(BUTTON_CODE_START)) {
+	if app.pressedKeysCodes.Contains(sdl.K_q) || (app.pressedButtonCodes.Contains(BUTTON_CODE_MENU) && app.pressedButtonCodes.Contains(BUTTON_CODE_START)) {
 		app.Stop()
 	}
 }
@@ -137,7 +143,10 @@ func (app *Application) UpdateView() {
 		println(err.Error())
 		os.Exit(1)
 	}
-	if err := app.sdlRenderer.Copy(app.resources[RESOURCE_BGR_KEY].T, nil, &sdl.Rect{X: 0, Y: 0, W: int32(app.settings.WindowWidth), H: int32(app.settings.WindowHeight)}); err != nil {
+	if err := app.sdlRenderer.Copy(app.resources[RESOURCE_BGR_KEY].T, nil, &sdl.Rect{X: 0, Y: 0, W: app.resources[RESOURCE_BGR_KEY].W, H: app.resources[RESOURCE_BGR_KEY].H}); err != nil {
+		println(err.Error())
+	}
+	if err := app.sdlRenderer.Copy(app.resources[RESOURCE_CIRCLE_YELLOW_KEY].T, nil, &sdl.Rect{X: 100, Y: 0, W: app.resources[RESOURCE_CIRCLE_YELLOW_KEY].W, H: app.resources[RESOURCE_CIRCLE_YELLOW_KEY].H}); err != nil {
 		println(err.Error())
 	}
 	app.renderJoystick(BUTTON_CODE_LEFT_JOYSTICK, Reactors[BUTTON_CODE_LEFT_JOYSTICK].OffsetX, Reactors[BUTTON_CODE_LEFT_JOYSTICK].OffsetY, app.axisValues[0], app.axisValues[1], sdl.K_l)

@@ -41,11 +41,10 @@ const (
 )
 
 const (
-	BUTTON_CODE_FN             = ButtonCode(12)
-	BUTTON_CODE_START          = ButtonCode(13)
+	BUTTON_CODE_MENU           = ButtonCode(5)
+	BUTTON_CODE_START          = ButtonCode(6)
 	BUTTON_CODE_LEFT_JOYSTICK  = ButtonCode(14)
 	BUTTON_CODE_RIGHT_JOYSTICK = ButtonCode(15)
-	BUTTON_CODE_SELECT         = ButtonCode(16)
 )
 
 const (
