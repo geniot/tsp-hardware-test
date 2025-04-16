@@ -5,7 +5,9 @@ import (
 	mapset "github.com/deckarep/golang-set/v2"
 	"github.com/tevino/abool/v2"
 	"github.com/veandco/go-sdl2/sdl"
+	"log"
 	"os"
+	"runtime/debug"
 )
 
 type Application struct {
@@ -27,37 +29,37 @@ func NewApplication() *Application {
 		pressedButtonCodes: mapset.NewSet[ButtonCode](),
 		isRunning:          abool.New(),
 		resources:          make(map[int]*SurfTexture),
+		settings:           NewSettings(),
 	}
 }
 
 func (app *Application) Start(args []string) {
-	var err error
-
-	if err := sdl.Init(sdl.INIT_VIDEO | sdl.INIT_JOYSTICK | sdl.INIT_GAMECONTROLLER); err != nil {
-		println(err.Error())
-		os.Exit(1)
-	}
+	defer func() {
+		if r := recover(); r != nil {
+			log.Printf("Unhandled error: %v\n", r)
+			log.Println("Stack trace:")
+			debug.PrintStack()
+			os.Exit(-1)
+		}
+	}()
+	orPanic(sdl.Init(sdl.INIT_VIDEO | sdl.INIT_JOYSTICK | sdl.INIT_GAMECONTROLLER))
 	sdl.JoystickEventState(sdl.ENABLE)
 	for i := 0; i < sdl.NumJoysticks(); i++ {
 		if sdl.IsGameController(i) {
 			app.sdlGameController = sdl.GameControllerOpen(i)
 		}
 	}
+	orPanic(app.sdlGameController != nil)
 
-	app.settings = NewSettings()
-	if app.sdlWindow, err = sdl.CreateWindow(
+	app.sdlWindow = orPanicRes(sdl.CreateWindow(
 		APP_NAME+" "+APP_VERSION,
 		int32(app.settings.WindowPosX), int32(app.settings.WindowPosY),
 		int32(app.settings.WindowWidth), int32(app.settings.WindowHeight),
-		uint32(app.settings.WindowState)); err != nil {
-		println(err.Error())
-		os.Exit(1)
-	}
-	if app.sdlRenderer, err = sdl.CreateRenderer(app.sdlWindow, -1, sdl.RENDERER_PRESENTVSYNC|sdl.RENDERER_ACCELERATED); err != nil {
-		println(err.Error())
-		os.Exit(1)
-	}
+		uint32(app.settings.WindowState)))
+
+	app.sdlRenderer = orPanicRes(sdl.CreateRenderer(app.sdlWindow, -1, sdl.RENDERER_PRESENTVSYNC|sdl.RENDERER_ACCELERATED))
 	app.initResources() //should be called after the creation of sdlRenderer
+
 	app.isRunning.Set()
 	for app.isRunning.IsSet() {
 		app.UpdateEvents()
@@ -69,6 +71,8 @@ func (app *Application) Start(args []string) {
 func (app *Application) Stop() {
 	app.isRunning.UnSet()
 	app.settings.Save(app.sdlWindow)
+	app.sdlGameController.Close()
+	sdl.Quit()
 }
 
 func (app *Application) UpdateEvents() {
@@ -78,6 +82,7 @@ func (app *Application) UpdateEvents() {
 		case *sdl.JoyAxisEvent:
 			// Convert the value to a -1.0 - 1.0 range
 			value := float32(t.Value) / 32768.0
+			println(t.Axis, value)
 			app.axisValues[t.Axis] = value
 			break
 
@@ -135,20 +140,12 @@ func (app *Application) UpdatePhysics() {
 }
 
 func (app *Application) UpdateView() {
-	if err := app.sdlRenderer.SetDrawColorArray(BACKGROUND_COLOR.R, BACKGROUND_COLOR.G, BACKGROUND_COLOR.B, BACKGROUND_COLOR.A); err != nil {
-		println(err.Error())
-		os.Exit(1)
-	}
-	if err := app.sdlRenderer.Clear(); err != nil {
-		println(err.Error())
-		os.Exit(1)
-	}
-	if err := app.sdlRenderer.Copy(app.resources[RESOURCE_BGR_KEY].T, nil, &sdl.Rect{X: 0, Y: 0, W: app.resources[RESOURCE_BGR_KEY].W, H: app.resources[RESOURCE_BGR_KEY].H}); err != nil {
-		println(err.Error())
-	}
-	if err := app.sdlRenderer.Copy(app.resources[RESOURCE_CIRCLE_YELLOW_KEY].T, nil, &sdl.Rect{X: 100, Y: 0, W: app.resources[RESOURCE_CIRCLE_YELLOW_KEY].W, H: app.resources[RESOURCE_CIRCLE_YELLOW_KEY].H}); err != nil {
-		println(err.Error())
-	}
+	orPanic(app.sdlRenderer.SetDrawColorArray(BACKGROUND_COLOR.R, BACKGROUND_COLOR.G, BACKGROUND_COLOR.B, BACKGROUND_COLOR.A))
+	orPanic(app.sdlRenderer.Clear())
+
+	orWarn(app.sdlRenderer.Copy(app.resources[RESOURCE_BGR_KEY].T, nil, &sdl.Rect{X: 0, Y: 0, W: app.resources[RESOURCE_BGR_KEY].W, H: app.resources[RESOURCE_BGR_KEY].H}))
+	orWarn(app.sdlRenderer.Copy(app.resources[RESOURCE_CIRCLE_YELLOW_KEY].T, nil, &sdl.Rect{X: 100, Y: 0, W: app.resources[RESOURCE_CIRCLE_YELLOW_KEY].W, H: app.resources[RESOURCE_CIRCLE_YELLOW_KEY].H}))
+
 	app.renderJoystick(BUTTON_CODE_LEFT_JOYSTICK, Reactors[BUTTON_CODE_LEFT_JOYSTICK].OffsetX, Reactors[BUTTON_CODE_LEFT_JOYSTICK].OffsetY, app.axisValues[0], app.axisValues[1], sdl.K_l)
 	app.renderJoystick(BUTTON_CODE_RIGHT_JOYSTICK, Reactors[BUTTON_CODE_RIGHT_JOYSTICK].OffsetX, Reactors[BUTTON_CODE_RIGHT_JOYSTICK].OffsetY, app.axisValues[3], app.axisValues[4], sdl.K_r)
 
@@ -156,10 +153,7 @@ func (app *Application) UpdateView() {
 		if Reactors[val] != nil {
 			width := If(Reactors[val].Width == 0, app.resources[Reactors[val].ResourceKey].W, Reactors[val].Width)
 			height := If(Reactors[val].Height == 0, app.resources[Reactors[val].ResourceKey].H, Reactors[val].Height)
-			if err := app.sdlRenderer.Copy(app.resources[Reactors[val].ResourceKey].T, nil,
-				&sdl.Rect{X: Reactors[val].OffsetX, Y: Reactors[val].OffsetY, W: width, H: height}); err != nil {
-				println(err.Error())
-			}
+			orWarn(app.sdlRenderer.Copy(app.resources[Reactors[val].ResourceKey].T, nil, &sdl.Rect{X: Reactors[val].OffsetX, Y: Reactors[val].OffsetY, W: width, H: height}))
 		}
 	}
 	app.sdlRenderer.Present()
@@ -168,21 +162,16 @@ func (app *Application) UpdateView() {
 func (app *Application) renderJoystick(joystickButtonCode ButtonCode, posX, posY int32, axisX, axisY float32, debugKeyCode sdl.Keycode) {
 	//drawing yellow joystick circles
 	if app.pressedKeysCodes.Contains(debugKeyCode) || (axisX != 0 || axisY != 0) && !app.pressedButtonCodes.Contains(joystickButtonCode) {
-		if err := app.sdlRenderer.Copy(app.resources[RESOURCE_CIRCLE_YELLOW_KEY].T, nil,
-			&sdl.Rect{X: posX, Y: posY, W: app.resources[RESOURCE_CIRCLE_YELLOW_KEY].W, H: app.resources[RESOURCE_CIRCLE_YELLOW_KEY].H}); err != nil {
-			println(err.Error())
-		}
+		orWarn(app.sdlRenderer.Copy(app.resources[RESOURCE_CIRCLE_YELLOW_KEY].T, nil, &sdl.Rect{X: posX, Y: posY, W: app.resources[RESOURCE_CIRCLE_YELLOW_KEY].W, H: app.resources[RESOURCE_CIRCLE_YELLOW_KEY].H}))
 	}
 	//cross-hairs
 	if axisX != 0 || axisY != 0 {
-		if err := app.sdlRenderer.Copy(app.resources[RESOURCE_CROSS_YELLOW_KEY].T, nil,
+		orWarn(app.sdlRenderer.Copy(app.resources[RESOURCE_CROSS_YELLOW_KEY].T, nil,
 			&sdl.Rect{
 				X: SCREEN_LEFT_UP_X + SCREEN_WIDTH/2 + int32(float32(SCREEN_WIDTH/2)*axisX),
 				Y: SCREEN_LEFT_UP_Y + SCREEN_HEIGHT/2 + int32(float32(SCREEN_HEIGHT/2)*axisY),
 				W: app.resources[RESOURCE_CROSS_YELLOW_KEY].W,
-				H: app.resources[RESOURCE_CROSS_YELLOW_KEY].H}); err != nil {
-			println(err.Error())
-		}
+				H: app.resources[RESOURCE_CROSS_YELLOW_KEY].H}))
 	}
 }
 

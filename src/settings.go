@@ -74,37 +74,22 @@ func NewSettings() *Settings {
 		settings     = &Settings{}
 		props        = properties.NewProperties()
 		userHomeDir  string
-		displayMode  sdl.DisplayMode
-		screenWidth  = 640
-		screenHeight = 480
+		screenWidth  = TSP_SCREEN_WIDTH
+		screenHeight = TSP_SCREEN_HEIGHT
 		err          error
 	)
-	if displayMode, err = sdl.GetDesktopDisplayMode(0); err != nil {
-		println(err.Error())
-		os.Exit(1)
-	} else {
-		screenWidth = int(displayMode.W)
-		screenHeight = int(displayMode.H)
-	}
 	if userHomeDir, err = os.UserHomeDir(); err == nil {
 		if props, err = properties.LoadFile(userHomeDir+propDirName+propFileName, properties.UTF8); err != nil {
 			log.Println(err)
 			props = properties.NewProperties()
 		}
 	}
-	settings.WindowWidth = TSP_SCREEN_WIDTH   //props.GetInt(KeyWindowWidth, If(screenWidth > 800, 800, screenWidth))
-	settings.WindowHeight = TSP_SCREEN_HEIGHT //props.GetInt(KeyWindowHeight, If(screenHeight > 600, 600, screenHeight))
+	settings.WindowWidth = TSP_SCREEN_WIDTH
+	settings.WindowHeight = TSP_SCREEN_HEIGHT
 	settings.WindowPosX = props.GetInt(KeyWindowPosX, (screenWidth-settings.WindowWidth)/2)
 	settings.WindowPosY = props.GetInt(KeyWindowPosY, (screenHeight-settings.WindowHeight)/2)
 	settings.WindowState = sdl.WINDOW_SHOWN
 	settings.WindowDisplayIndex = props.GetInt(KeyWindowDisplayIndex, 0)
-
-	//patching window state
-	//settings.WindowState |= sdl.WINDOW_RESIZABLE
-	//settings.WindowState |= sdl.WINDOW_MAXIMIZED
-	if screenWidth <= TSP_SCREEN_WIDTH && screenHeight <= TSP_SCREEN_HEIGHT {
-		settings.WindowState |= sdl.WINDOW_BORDERLESS
-	}
 
 	return settings
 }
