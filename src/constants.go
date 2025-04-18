@@ -37,7 +37,6 @@ const (
 	RESOURCE_BGR_KEY           = ResourceKey(iota)
 	RESOURCE_CIRCLE_YELLOW_KEY = ResourceKey(iota)
 	RESOURCE_CROSS_YELLOW_KEY  = ResourceKey(iota)
-	RESOURCE_CIRCLE_RED_KEY    = ResourceKey(iota)
 )
 
 const (
@@ -48,26 +47,26 @@ const (
 )
 
 const (
-	SCREEN_LEFT_UP_X    = int32(235)
-	SCREEN_LEFT_UP_Y    = int32(130)
-	SCREEN_RIGHT_DOWN_X = int32(400)
-	SCREEN_RIGHT_DOWN_Y = int32(253)
-	SCREEN_WIDTH        = SCREEN_RIGHT_DOWN_X - SCREEN_LEFT_UP_X
-	SCREEN_HEIGHT       = SCREEN_RIGHT_DOWN_Y - SCREEN_LEFT_UP_Y
+	SCREEN_LEFT_UP_X     = int32(361)
+	SCREEN_LEFT_UP_Y     = int32(192)
+	SCREEN_RIGHT_DOWN_X  = int32(919)
+	SCREEN_RIGHT_DOWN_Y  = int32(508)
+	SCREEN_WIDTH         = SCREEN_RIGHT_DOWN_X - SCREEN_LEFT_UP_X
+	SCREEN_HEIGHT        = SCREEN_RIGHT_DOWN_Y - SCREEN_LEFT_UP_Y
+	JOYSTICK_INITIAL_MAX = 0.9
 )
 
 var (
 	Reactors = map[ButtonCode]*ImageDescriptor{
 		BUTTON_CODE_LEFT_JOYSTICK: {
-			OffsetX:     245,
-			OffsetY:     377,
-			Width:       10,
-			ResourceKey: RESOURCE_CIRCLE_RED_KEY,
+			OffsetX:     283,
+			OffsetY:     391,
+			ResourceKey: RESOURCE_CIRCLE_YELLOW_KEY,
 		},
 		BUTTON_CODE_RIGHT_JOYSTICK: {
-			OffsetX:     381,
-			OffsetY:     378,
-			ResourceKey: RESOURCE_CIRCLE_RED_KEY,
+			OffsetX:     955,
+			OffsetY:     391,
+			ResourceKey: RESOURCE_CIRCLE_YELLOW_KEY,
 		},
 	}
 )

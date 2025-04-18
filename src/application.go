@@ -7,10 +7,10 @@ import (
 	"github.com/veandco/go-sdl2/sdl"
 	"github.com/veandco/go-sdl2/ttf"
 	"log"
+	"math"
 	"os"
 	"runtime"
 	"runtime/debug"
-	"strconv"
 )
 
 type Application struct {
@@ -23,7 +23,9 @@ type Application struct {
 	joysticks          [16]*sdl.Joystick
 	pressedKeysCodes   mapset.Set[sdl.Keycode]
 	pressedButtonCodes mapset.Set[ButtonCode]
-	axisValues         [20]float32
+	axisValues         [4]float64
+	maxAxisValues      [4]float64
+	minAxisValues      [4]float64
 	isRunning          *abool.AtomicBool
 }
 
@@ -34,6 +36,8 @@ func NewApplication() *Application {
 		isRunning:          abool.New(),
 		resources:          make(map[int]*SurfTexture),
 		settings:           NewSettings(),
+		maxAxisValues:      [4]float64{JOYSTICK_INITIAL_MAX, JOYSTICK_INITIAL_MAX, JOYSTICK_INITIAL_MAX, JOYSTICK_INITIAL_MAX},
+		minAxisValues:      [4]float64{-JOYSTICK_INITIAL_MAX, -JOYSTICK_INITIAL_MAX, -JOYSTICK_INITIAL_MAX, -JOYSTICK_INITIAL_MAX},
 	}
 }
 
@@ -99,8 +103,11 @@ func (app *Application) UpdateEvents() {
 
 		case *sdl.JoyAxisEvent:
 			// Convert the value to a -1.0 - 1.0 range
-			value := float32(t.Value) / 32768.0
-			app.axisValues[t.Axis] = value
+			value := float64(t.Value) / 32768.0
+			ind := If(t.Axis == 3 || t.Axis == 4, t.Axis-1, t.Axis)
+			app.axisValues[ind] = value
+			app.maxAxisValues[ind] = math.Max(value, app.maxAxisValues[ind])
+			app.minAxisValues[ind] = math.Min(value, app.minAxisValues[ind])
 			break
 
 		case *sdl.ControllerButtonEvent:
@@ -161,17 +168,19 @@ func (app *Application) UpdateView() {
 	orPanic(app.sdlRenderer.Clear())
 
 	orWarn(app.sdlRenderer.Copy(app.resources[RESOURCE_BGR_KEY].T, nil, &sdl.Rect{X: 0, Y: 0, W: app.resources[RESOURCE_BGR_KEY].W, H: app.resources[RESOURCE_BGR_KEY].H}))
-	orWarn(app.sdlRenderer.Copy(app.resources[RESOURCE_CIRCLE_YELLOW_KEY].T, nil, &sdl.Rect{X: 100, Y: 0, W: app.resources[RESOURCE_CIRCLE_YELLOW_KEY].W, H: app.resources[RESOURCE_CIRCLE_YELLOW_KEY].H}))
 
-	app.renderJoystick(BUTTON_CODE_LEFT_JOYSTICK, Reactors[BUTTON_CODE_LEFT_JOYSTICK].OffsetX, Reactors[BUTTON_CODE_LEFT_JOYSTICK].OffsetY, app.axisValues[0], app.axisValues[1], sdl.K_l)
-	app.renderJoystick(BUTTON_CODE_RIGHT_JOYSTICK, Reactors[BUTTON_CODE_RIGHT_JOYSTICK].OffsetX, Reactors[BUTTON_CODE_RIGHT_JOYSTICK].OffsetY, app.axisValues[3], app.axisValues[4], sdl.K_r)
+	app.renderJoystick(Reactors[BUTTON_CODE_LEFT_JOYSTICK].OffsetX, Reactors[BUTTON_CODE_LEFT_JOYSTICK].OffsetY, 0, 1, sdl.K_l)
+	app.renderJoystick(Reactors[BUTTON_CODE_RIGHT_JOYSTICK].OffsetX, Reactors[BUTTON_CODE_RIGHT_JOYSTICK].OffsetY, 2, 3, sdl.K_r)
 
-	var arr = [4]int{0, 1, 3, 4}
-	for i := 0; i < len(arr); i++ {
-		var val = float64(app.axisValues[arr[i]])
-		var valStr = strconv.FormatFloat(val, 'f', 6, 64)
-		app.drawText(valStr, int32(If(val < 0, 5, 18)), int32(i*30))
-	}
+	//used to debug joystick values
+	//for i := 0; i < len(app.axisValues); i++ {
+	//	var val = float64(app.axisValues[i])
+	//	var valStr = strconv.FormatFloat(val, 'f', 6, 64)
+	//	app.drawText(valStr, int32(If(val < 0, 5, 18)), int32(i*30))
+	//}
+	//var procent = (app.axisValues[0] * 100 / If(app.axisValues[0] > 0, app.maxAxisValues[0], -app.minAxisValues[0])) / 100
+	//var valStr = strconv.FormatFloat(procent, 'f', 6, 64)
+	//app.drawText(valStr, 5, 120)
 
 	for val := range app.pressedButtonCodes.Iter() {
 		if Reactors[val] != nil {
@@ -183,17 +192,28 @@ func (app *Application) UpdateView() {
 	app.sdlRenderer.Present()
 }
 
-func (app *Application) renderJoystick(joystickButtonCode ButtonCode, posX, posY int32, axisX, axisY float32, debugKeyCode sdl.Keycode) {
+func (app *Application) renderJoystick(posX, posY int32, axisIndexX, axisIndexY int, debugKeyCode sdl.Keycode) {
+	var (
+		axisX                 = app.axisValues[axisIndexX]
+		axisY                 = app.axisValues[axisIndexY]
+		roundedX              = toFixed(axisX, 3)
+		roundedY              = toFixed(axisY, 3)
+		correctedX            = (app.axisValues[axisIndexX] * 100 / If(app.axisValues[axisIndexX] > 0, app.maxAxisValues[axisIndexX], -app.minAxisValues[axisIndexX])) / 100
+		correctedY            = (app.axisValues[axisIndexY] * 100 / If(app.axisValues[axisIndexY] > 0, app.maxAxisValues[axisIndexY], -app.minAxisValues[axisIndexY])) / 100
+		correctedScreenWidth  = SCREEN_WIDTH - app.resources[RESOURCE_CROSS_YELLOW_KEY].W
+		correctedScreenHeight = SCREEN_HEIGHT - app.resources[RESOURCE_CROSS_YELLOW_KEY].H
+	)
 	//drawing yellow joystick circles
-	if app.pressedKeysCodes.Contains(debugKeyCode) || (axisX != 0 || axisY != 0) && !app.pressedButtonCodes.Contains(joystickButtonCode) {
-		orWarn(app.sdlRenderer.Copy(app.resources[RESOURCE_CIRCLE_YELLOW_KEY].T, nil, &sdl.Rect{X: posX, Y: posY, W: app.resources[RESOURCE_CIRCLE_YELLOW_KEY].W, H: app.resources[RESOURCE_CIRCLE_YELLOW_KEY].H}))
+	if app.pressedKeysCodes.Contains(debugKeyCode) || (roundedX != 0 || roundedY != 0) {
+		orWarn(app.sdlRenderer.Copy(app.resources[RESOURCE_CIRCLE_YELLOW_KEY].T, nil,
+			&sdl.Rect{X: posX, Y: posY, W: app.resources[RESOURCE_CIRCLE_YELLOW_KEY].W, H: app.resources[RESOURCE_CIRCLE_YELLOW_KEY].H}))
 	}
 	//cross-hairs
-	if axisX != 0 || axisY != 0 {
+	if roundedX != 0 || roundedY != 0 {
 		orWarn(app.sdlRenderer.Copy(app.resources[RESOURCE_CROSS_YELLOW_KEY].T, nil,
 			&sdl.Rect{
-				X: SCREEN_LEFT_UP_X + SCREEN_WIDTH/2 + int32(float32(SCREEN_WIDTH/2)*axisX),
-				Y: SCREEN_LEFT_UP_Y + SCREEN_HEIGHT/2 + int32(float32(SCREEN_HEIGHT/2)*axisY),
+				X: SCREEN_LEFT_UP_X + correctedScreenWidth/2 + int32(float64(correctedScreenWidth/2)*correctedX),
+				Y: SCREEN_LEFT_UP_Y + correctedScreenHeight/2 + int32(float64(correctedScreenHeight/2)*correctedY),
 				W: app.resources[RESOURCE_CROSS_YELLOW_KEY].W,
 				H: app.resources[RESOURCE_CROSS_YELLOW_KEY].H}))
 	}
@@ -203,7 +223,6 @@ func (app *Application) initResources() {
 	app.resources[RESOURCE_BGR_KEY] = LoadSurfTexture("bgr.png", app.sdlRenderer)
 	app.resources[RESOURCE_CIRCLE_YELLOW_KEY] = LoadSurfTexture("circle_yellow.png", app.sdlRenderer)
 	app.resources[RESOURCE_CROSS_YELLOW_KEY] = LoadSurfTexture("cross_yellow.png", app.sdlRenderer)
-	app.resources[RESOURCE_CIRCLE_RED_KEY] = LoadSurfTexture("circle_red.png", app.sdlRenderer)
 }
 
 func (app *Application) drawText(val string, x, y int32) {
