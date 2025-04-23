@@ -2,7 +2,7 @@ PROJECT_NAME := tsp-hardware-test
 PROGRAM_NAME := hwt
 DEPLOY_PATH := /mnt/SDCARD/Apps/HardwareTest
 
-IP := 192.168.0.105
+IP := 192.168.0.102
 USN := root
 PWD := tina
 
@@ -12,11 +12,11 @@ clean:
 	rm bin/${PROGRAM_NAME} -f
 
 docker:
-	#docker run -d --name arkos-sdk -c 1024 -it --volume=/home/vitaly/GolandProjects/:/work/ --workdir=/work/ arkos-sdk
-	docker exec arkos-sdk /bin/bash -c 'cd ${PROJECT_NAME} && make build'
+	#docker run -d --name trimui-sdk -c 1024 -it --volume=/opt/TrimuiProjects/:/work/ --workdir=/work/ trimui-sdk
+	docker exec trimui-sdk /bin/bash -c 'cd ${PROJECT_NAME} && make build'
 
 build:
-	go build -o bin/${PROGRAM_NAME} ${PROJECT_NAME}/src/
+	go build -tags="sdl es2" -o bin/${PROGRAM_NAME} ${PROJECT_NAME}/src/
 
 deploy:
 	sshpass -p ${PWD} ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null ${USN}@${IP} "rm ${DEPLOY_PATH}/${PROGRAM_NAME} -f"
