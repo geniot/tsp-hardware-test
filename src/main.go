@@ -30,17 +30,19 @@ const (
 )
 
 const (
-	SCREEN_LEFT_UP_X     = int32(361)
-	SCREEN_LEFT_UP_Y     = int32(192)
-	SCREEN_RIGHT_DOWN_X  = int32(919)
-	SCREEN_RIGHT_DOWN_Y  = int32(508)
-	SCREEN_WIDTH         = SCREEN_RIGHT_DOWN_X - SCREEN_LEFT_UP_X
-	SCREEN_HEIGHT        = SCREEN_RIGHT_DOWN_Y - SCREEN_LEFT_UP_Y
-	JOYSTICK_INITIAL_MAX = 0.9
+	screenLeftUpX      = int32(361)
+	screenLeftUpY      = int32(192)
+	screenRightDownX   = int32(919)
+	screenRightDownY   = int32(508)
+	screenWidth        = screenRightDownX - screenLeftUpX
+	screenHeight       = screenRightDownY - screenLeftUpY
+	joystickInitialMax = 0.9
 )
 
 func main() {
+	rl.SetConfigFlags(rl.FlagMsaa4xHint)
 	rl.InitWindow(1280, 720, "TrimUI Hardware Test")
+	rl.InitAudioDevice()
 	rl.SetTargetFPS(60)
 
 	var (
@@ -50,12 +52,14 @@ func main() {
 		crossTexture                                               = rl.LoadTextureFromImage(rl.LoadImageFromMemory(".png", crossBytes, int32(len(crossBytes))))
 		bgrBytes                                                   = orPanicRes(mediaList.ReadFile("media/bgr.png"))
 		bgrTexture                                                 = rl.LoadTextureFromImage(rl.LoadImageFromMemory(".png", bgrBytes, int32(len(bgrBytes))))
+		soundBytes                                                 = orPanicRes(mediaList.ReadFile("media/sound.wav"))
+		sound                                                      = rl.LoadSoundFromWave(rl.LoadWaveFromMemory(".wav", soundBytes, int32(len(soundBytes))))
 		keyColor                                                   = rl.Lime
 		x1, y1, x2, y2                                     float64 = 0, 0, 0, 0
 		roundedX1, roundedY1, roundedX2, roundedY2         float64 = 0, 0, 0, 0
 		correctedX1, correctedY1, correctedX2, correctedY2 float64 = 0, 0, 0, 0
-		maxX1, maxY1, maxX2, maxY2                                 = JOYSTICK_INITIAL_MAX, JOYSTICK_INITIAL_MAX, JOYSTICK_INITIAL_MAX, JOYSTICK_INITIAL_MAX
-		minX1, minY1, minX2, minY2                                 = -JOYSTICK_INITIAL_MAX, -JOYSTICK_INITIAL_MAX, -JOYSTICK_INITIAL_MAX, -JOYSTICK_INITIAL_MAX
+		maxX1, maxY1, maxX2, maxY2                                 = joystickInitialMax, joystickInitialMax, joystickInitialMax, joystickInitialMax
+		minX1, minY1, minX2, minY2                                 = -joystickInitialMax, -joystickInitialMax, -joystickInitialMax, -joystickInitialMax
 	)
 
 	for !rl.WindowShouldClose() && !shouldExit {
@@ -63,6 +67,9 @@ func main() {
 		rl.BeginDrawing()
 		rl.ClearBackground(rl.RayWhite)
 		rl.DrawTexture(bgrTexture, 0, 0, rl.White)
+
+		rl.DrawText("MENU+SELECT : Play Sound", 5, 695, 20, rl.DarkBlue)
+		rl.DrawText("MENU+START  : Exit", 1060, 695, 20, rl.DarkBlue)
 
 		//functional
 		if rl.IsGamepadButtonDown(gamePadId, menuCode) || rl.IsKeyDown(rl.KeyM) {
@@ -150,16 +157,19 @@ func main() {
 		if roundedX1 != 0 && roundedY1 != 0 {
 			rl.DrawTexture(
 				crossTexture,
-				SCREEN_LEFT_UP_X+(SCREEN_WIDTH-crossTexture.Width)/2+int32(float64((SCREEN_WIDTH-crossTexture.Width)/2)*correctedX1),
-				SCREEN_LEFT_UP_Y+(SCREEN_HEIGHT-crossTexture.Height)/2+int32(float64((SCREEN_HEIGHT-crossTexture.Height)/2)*correctedY1),
+				screenLeftUpX+(screenWidth-crossTexture.Width)/2+int32(float64((screenWidth-crossTexture.Width)/2)*correctedX1),
+				screenLeftUpY+(screenHeight-crossTexture.Height)/2+int32(float64((screenHeight-crossTexture.Height)/2)*correctedY1),
 				rl.White)
 		}
 		if roundedX2 != 0 && roundedY2 != 0 {
 			rl.DrawTexture(
 				crossTexture,
-				SCREEN_LEFT_UP_X+(SCREEN_WIDTH-crossTexture.Width)/2+int32(float64((SCREEN_WIDTH-crossTexture.Width)/2)*correctedX2),
-				SCREEN_LEFT_UP_Y+(SCREEN_HEIGHT-crossTexture.Height)/2+int32(float64((SCREEN_HEIGHT-crossTexture.Height)/2)*correctedY2),
+				screenLeftUpX+(screenWidth-crossTexture.Width)/2+int32(float64((screenWidth-crossTexture.Width)/2)*correctedX2),
+				screenLeftUpY+(screenHeight-crossTexture.Height)/2+int32(float64((screenHeight-crossTexture.Height)/2)*correctedY2),
 				rl.White)
+		}
+		if (rl.IsGamepadButtonDown(gamePadId, menuCode) && rl.IsGamepadButtonDown(gamePadId, selectCode)) || rl.IsKeyDown(rl.KeyU) {
+			rl.PlaySound(sound)
 		}
 
 		//exit
@@ -169,6 +179,7 @@ func main() {
 		rl.EndDrawing()
 	}
 	rl.UnloadTexture(bgrTexture)
+	rl.UnloadTexture(crossTexture)
 	rl.CloseWindow()
 }
 
