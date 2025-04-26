@@ -1,7 +1,6 @@
 package main
 
 import (
-	"embed"
 	"github.com/veandco/go-sdl2/sdl"
 )
 
@@ -13,11 +12,6 @@ const (
 	APP_VERSION       = "0.1"
 	TSP_SCREEN_WIDTH  = 1280
 	TSP_SCREEN_HEIGHT = 720
-)
-
-var (
-	//go:embed media/*
-	mediaList embed.FS
 )
 
 var (
