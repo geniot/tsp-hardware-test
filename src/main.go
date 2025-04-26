@@ -141,10 +141,10 @@ func main() {
 		roundedX2 = toFixed(x2, 3)
 		roundedY2 = toFixed(y2, 3)
 
-		correctedX1 = (x1 * 100 / If(x1 > 0, maxX1, -minX1)) / 100
-		correctedY1 = (y1 * 100 / If(y1 > 0, maxY1, -minY1)) / 100
-		correctedX2 = (x2 * 100 / If(x2 > 0, maxX2, -minX2)) / 100
-		correctedY2 = (y2 * 100 / If(y2 > 0, maxY2, -minY2)) / 100
+		correctedX1 = x1 / If(x1 > 0, maxX1, -minX1)
+		correctedY1 = y1 / If(y1 > 0, maxY1, -minY1)
+		correctedX2 = x2 / If(x2 > 0, maxX2, -minX2)
+		correctedY2 = y2 / If(y2 > 0, maxY2, -minY2)
 
 		if (roundedX1 != 0 && roundedY1 != 0) || rl.IsKeyDown(rl.KeyL) {
 			rl.DrawCircle(304, 412, 20, keyColor)
